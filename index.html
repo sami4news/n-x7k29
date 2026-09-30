@@ -21,7 +21,7 @@ input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);back
 <input id="q" placeholder="🔍 بحث في الأخبار">
 <div class="tabs" id="tabs"></div><div id="l"></div></div>
 <script>
-const C={all:"🗂️ الكل",urgent:"🚨 عاجل",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد",sport:"⚽ رياضة"};
+const C={all:"🗂️ الكل",urgent:"🚨 عاجل",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد"};
 let D=[],cat="all";const $=i=>document.getElementById(i);
 for(const k in C){const b=document.createElement("button");b.textContent=C[k];b.dataset.k=k;b.onclick=()=>{cat=k;R()};$("tabs").append(b)}
 $("q").oninput=R;
