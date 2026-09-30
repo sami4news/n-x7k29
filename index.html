@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>نشرة الأخبار اليومية</title>
+<style>
+:root{--bg:#121824;--card:#1e2530;--text:#f0f4f8;--mut:#9fb0c3;--bd:#4a90e2;--pri:#5da9e9;--wa:#25d366}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;padding:14px;display:flex;justify-content:center}
+.w{max-width:560px;width:100%}header{background:linear-gradient(135deg,#5da9e9,#4a90e2);border-radius:20px;padding:14px;text-align:center;margin-bottom:12px}
+h1{margin:0;font-size:1.25em}header small{opacity:.9}
+input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--text);font:inherit;margin-bottom:8px}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}.tabs button{flex:none;background:var(--card);color:var(--text);border:1px solid var(--bd);border-radius:20px;padding:8px 14px;font-weight:bold;cursor:pointer}
+.tabs button.on{background:var(--bd)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;margin:12px 0;overflow:hidden}
+.card img{width:100%;max-height:230px;object-fit:cover;display:block}
+.b{padding:12px}.m{font-size:.75em;color:var(--pri);font-weight:bold}.card h2{font-size:1.02em;margin:5px 0;line-height:1.55}
+.card p{margin:0 0 10px;color:var(--mut);font-size:.9em;line-height:1.7}
+.r{display:flex;gap:8px;flex-wrap:wrap}.r button,.r a{flex:1;min-width:85px;text-align:center;text-decoration:none;border:0;border-radius:12px;padding:11px 6px;font-weight:bold;cursor:pointer;font-size:.93em;color:#fff}
+.wa{background:var(--wa)}.cp{background:#34495e}.ln{border:1px solid var(--bd)!important;color:var(--pri)!important;background:none}
+.n{text-align:center;color:var(--mut);padding:20px}
+</style></head><body><div class="w">
+<header><h1>📰 نشرة الأخبار اليومية</h1><small id="u"></small></header>
+<input id="q" placeholder="🔍 بحث في الأخبار">
+<div class="tabs" id="tabs"></div><div id="l"></div></div>
+<script>
+const C={all:"🗂️ الكل",urgent:"🚨 عاجل",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد",sport:"⚽ رياضة"};
+let D=[],cat="all";const $=i=>document.getElementById(i);
+for(const k in C){const b=document.createElement("button");b.textContent=C[k];b.dataset.k=k;b.onclick=()=>{cat=k;R()};$("tabs").append(b)}
+$("q").oninput=R;
+const msg=n=>`*${n.t}*\n\n${n.b?n.b+"\n\n":""}${n.vid?"🎥 "+n.vid+"\n":""}🔗 ${n.s}`;
+function R(){document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.k==cat));
+const q=$("q").value.trim(),L=$("l");L.innerHTML="";
+const a=D.filter(n=>(cat=="all"||n.c==cat)&&(!q||(n.t+n.b).includes(q)));
+if(!a.length){L.innerHTML='<div class="n">لا توجد أخبار</div>';return}
+a.forEach(n=>{const d=document.createElement("div");d.className="card";
+if(n.img){const i=document.createElement("img");i.src=n.img;i.loading="lazy";i.referrerPolicy="no-referrer";i.onerror=()=>i.remove();d.append(i)}
+const b=document.createElement("div");b.className="b";
+const m=document.createElement("div");m.className="m";m.textContent=`${C[n.c]} • ${n.src} • ${new Date(n.ts*1000).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})}`;
+const h=document.createElement("h2");h.textContent=n.t;const p=document.createElement("p");p.textContent=n.b;
+const r=document.createElement("div");r.className="r";
+const w=document.createElement("button");w.className="wa";w.textContent="📲 واتساب";w.onclick=()=>open("https://wa.me/?text="+encodeURIComponent(msg(n)));
+const c=document.createElement("button");c.className="cp";c.textContent="📋 نسخ";c.onclick=()=>navigator.clipboard.writeText(msg(n)).then(()=>c.textContent="✅ تم");
+const k=document.createElement("a");k.className="ln";k.href=n.vid||n.s;k.target="_blank";k.textContent=n.vid?"🎥 فيديو":"🔗 المصدر";
+r.append(w,c,k);b.append(m,h,p,r);d.append(b);L.append(d)})}
+async function load(){try{const j=await (await fetch("news.json?"+Date.now())).json();D=j.items;
+$("u").textContent=j.updated?"آخر تحديث: "+new Date(j.updated*1000).toLocaleString("ar-SA"):"بانتظار أول تحديث";R()}catch(e){$("l").innerHTML='<div class="n">تعذّر تحميل الأخبار</div>'}}
+load();setInterval(load,300000);
+</script></body></html>

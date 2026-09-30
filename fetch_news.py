@@ -1,0 +1,70 @@
+import json, re, time, urllib.request, html
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone, timedelta
+
+FEEDS = [
+ ("الجزيرة","https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdb83b6f7b8"),
+ ("BBC عربي","https://feeds.bbci.co.uk/arabic/rss.xml"),
+ ("سكاي نيوز عربية","https://www.skynewsarabia.com/web/rss"),
+ ("العربية","https://www.alarabiya.net/feed/rss2/ar.xml"),
+ ("الشرق الأوسط","https://aawsat.com/feed"),
+]
+KW = {
+ "urgent": ["عاجل","حصري"],
+ "war": ["غزة","حرب","قصف","غارة","صاروخ","هجوم","الحوثي","أوكرانيا","جيش","معارك","مسيّرة","مسيرة","إسرائيل","لبنان","إيران"],
+ "sa": ["السعود","الرياض","جدة","مكة","المدينة المنورة","ولي العهد","خادم الحرمين","نيوم","الدمام","أبها","واس"],
+ "eco": ["نفط","أسهم","الذهب","اقتصاد","بورصة","الدولار","أوبك","تضخم","الفائدة","أرباح","استثمار","سوق"],
+ "sport": ["مباراة","كأس","دوري","هدف","منتخب","الهلال","النصر","الاتحاد","الأهلي","كرة","لاعب","بطولة"],
+}
+ORDER = ["urgent","war","sa","eco","sport"]
+
+def classify(t):
+    for c in ORDER:
+        if any(k in t for k in KW[c]): return c
+    return "me"
+
+def clean(s):
+    return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",s or ""))).strip()
+
+def img_of(it):
+    for el in it.iter():
+        tag = el.tag.split("}")[-1]
+        if tag in ("content","thumbnail","enclosure"):
+            u = el.get("url")
+            t = el.get("type","")
+            if u and (tag!="enclosure" or t.startswith("image")) and not t.startswith("video"):
+                return u
+    m = re.search(r'<img[^>]+src=["\']([^"\']+)', ET.tostring(it, encoding="unicode"))
+    return html.unescape(m.group(1)) if m else ""
+
+def video_of(it):
+    for el in it.iter():
+        u = el.get("url") or ""
+        if el.get("type","").startswith("video") or u.endswith(".mp4"):
+            return u
+    return ""
+
+items, seen = [], set()
+now = datetime.now(timezone.utc)
+for name, url in FEEDS:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+        root = ET.fromstring(urllib.request.urlopen(req, timeout=25).read())
+    except Exception as e:
+        print("FAIL", name, e); continue
+    for it in root.iter("item"):
+        g = lambda k: (it.findtext(k) or "")
+        title, link = clean(g("title")), g("link").strip()
+        if not title or not link or link in seen: continue
+        try: d = parsedate_to_datetime(g("pubDate"))
+        except Exception: d = now
+        if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
+        if now - d > timedelta(hours=48): continue
+        seen.add(link)
+        summ = clean(g("description"))[:240]
+        items.append({"t":title,"b":summ,"s":link,"src":name,"c":classify(title+" "+summ),
+                      "img":img_of(it),"vid":video_of(it),"ts":int(d.timestamp())})
+items.sort(key=lambda x:-x["ts"])
+json.dump({"updated":int(time.time()),"items":items[:150]}, open("news.json","w",encoding="utf-8"), ensure_ascii=False)
+print("items:", len(items))
