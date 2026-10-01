@@ -88,7 +88,8 @@ def enrich(it):
         h = urllib.request.urlopen(req, timeout=8).read(250000).decode("utf-8","ignore")
     except Exception:
         return
-    if not it["img"]: it["img"] = meta(h, "og:image")
+    og = meta(h, "og:image")
+    if og: it["img"] = og  # صورة الصفحة أعلى جودة من مصغّرة RSS
     if not it["vid"]: it["vid"] = meta(h, "og:video:secure_url") or meta(h, "og:video")
 
 if __name__ == "__main__":
@@ -125,7 +126,8 @@ if __name__ == "__main__":
             items.append({"t":title,"b":summ,"s":link,"src":src,"c":cat,
                           "img":img_of(it),"vid":video_of(it),"ts":int(d.timestamp())})
     items.sort(key=lambda x:-x["ts"])
-    for it in [i for i in items if not i["img"] and "news.google.com" not in i["s"]][:40]:
-        enrich(it)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(8) as ex:
+        list(ex.map(enrich, [i for i in items if "news.google.com" not in i["s"]][:60]))
     json.dump({"updated":int(time.time()),"items":items[:200]}, open("news.json","w",encoding="utf-8"), ensure_ascii=False)
     print("items:", len(items))
