@@ -4,8 +4,10 @@
 <style>
 :root{--bg:#121824;--card:#1e2530;--text:#f0f4f8;--mut:#9fb0c3;--bd:#4a90e2;--pri:#5da9e9;--wa:#25d366}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;padding:14px;display:flex;justify-content:center}
-.w{max-width:560px;width:100%}header{background:linear-gradient(135deg,#5da9e9,#4a90e2);border-radius:20px;padding:14px;text-align:center;margin-bottom:12px}
-h1{margin:0;font-size:1.25em}header small{opacity:.9}
+.w{max-width:560px;width:100%}header{background:linear-gradient(135deg,#5da9e9,#4a90e2);border-radius:20px;padding:14px;text-align:center;margin-bottom:12px;color:#fff}
+h1{margin:0;font-size:1.25em}header small{display:block;opacity:.95;margin-top:3px}
+#tm{font-weight:bold;font-size:1.05em;margin:8px 0}
+.hb{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.hb button,.hb a{background:#fff;color:#1a4f8a;border:0;border-radius:12px;padding:9px 14px;font-weight:bold;cursor:pointer;text-decoration:none;font-size:.9em}
 input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--text);font:inherit;margin-bottom:8px}
 .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}.tabs button{flex:none;background:var(--card);color:var(--text);border:1px solid var(--bd);border-radius:20px;padding:8px 14px;font-weight:bold;cursor:pointer}
 .tabs button.on{background:var(--bd)}
@@ -13,34 +15,86 @@ input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);back
 .card img{width:100%;max-height:230px;object-fit:cover;display:block}
 .b{padding:12px}.m{font-size:.75em;color:var(--pri);font-weight:bold}.card h2{font-size:1.02em;margin:5px 0;line-height:1.55}
 .card p{margin:0 0 10px;color:var(--mut);font-size:.9em;line-height:1.7}
-.r{display:flex;gap:8px;flex-wrap:wrap}.r button,.r a{flex:1;min-width:85px;text-align:center;text-decoration:none;border:0;border-radius:12px;padding:11px 6px;font-weight:bold;cursor:pointer;font-size:.93em;color:#fff}
+.r{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.r button,.r a{flex:1;min-width:85px;text-align:center;text-decoration:none;border:0;border-radius:12px;padding:11px 6px;font-weight:bold;cursor:pointer;font-size:.93em;color:#fff}
 .wa{background:var(--wa)}.cp{background:#34495e}.ln{border:1px solid var(--bd)!important;color:var(--pri)!important;background:none}
-.n{text-align:center;color:var(--mut);padding:20px}
+.sh{background:#128c7e;flex-basis:100%!important}
+.vt{background:var(--bg);border:1px solid var(--bd)!important;color:var(--text)!important}.vt.on{background:var(--bd);}
+.n{text-align:center;color:var(--mut);padding:20px}.n button{background:none;border:1px solid var(--bd);color:var(--pri);border-radius:10px;padding:6px 12px;cursor:pointer}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 18px;border-radius:20px;display:none;max-width:90%;text-align:center;z-index:9}
 </style></head><body><div class="w">
-<header><h1>📰 نشرة الأخبار اليومية</h1><small id="u"></small></header>
+<header><h1>📰 نشرة الأخبار اليومية</h1><small id="u"></small><div id="tm">—</div>
+<div class="hb"><button id="rf">🔄 تحديث الآن</button><a id="gh" target="_blank" rel="noopener" href="https://github.com/sami4news/n-x7k29/actions/workflows/update.yml">⚡ تشغيل الروبوت</a><button id="rs">♻️ تصفير التفضيلات</button></div></header>
 <input id="q" placeholder="🔍 بحث في الأخبار">
-<div class="tabs" id="tabs"></div><div id="l"></div></div>
+<div class="tabs" id="tabs"></div><div id="l"></div></div><div id="toast"></div>
 <script>
-const C={all:"🗂️ الكل",urgent:"🚨 عاجل",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد"};
-let D=[],cat="all";const $=i=>document.getElementById(i);
+const C={all:"🗂️ الكل",urgent:"🚨 عاجل",wx:"🌧️ أرصاد وإنذارات",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد"};
+const $=i=>document.getElementById(i);
+let D=[],cat="all",UP=0,lastPoll=0,showHid=false;
+const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let P=LS.get("pf",{c:{},s:{},w:{}}),V=LS.get("vt",{});
+function toast(t,ms=2200){const e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",ms)}
 for(const k in C){const b=document.createElement("button");b.textContent=C[k];b.dataset.k=k;b.onclick=()=>{cat=k;R()};$("tabs").append(b)}
 $("q").oninput=R;
 const msg=n=>`*${n.t}*\n\n${n.b?n.b+"\n\n":""}${n.vid?"🎥 "+n.vid+"\n":""}🔗 ${n.s}`;
+/* ===== التعلّم من التفضيلات (يُحفظ في متصفحك) ===== */
+const toks=t=>[...new Set(t.replace(/[\u064B-\u0652ـ]/g,"").split(/[^\u0621-\u064Aa-zA-Z0-9]+/).filter(w=>w.length>=4))];
+const score=n=>Math.max(-6,Math.min(6,(P.c[n.c]||0)*.6+(P.s[n.src]||0)*.6+toks(n.t).reduce((a,w)=>a+(P.w[w]||0)*.5,0)));
+function vote(n,v){const old=V[n.s]||0,nv=old===v?0:v,d=nv-old;
+ P.c[n.c]=(P.c[n.c]||0)+d;P.s[n.src]=(P.s[n.src]||0)+d;toks(n.t).forEach(w=>P.w[w]=(P.w[w]||0)+d);
+ if(nv)V[n.s]=nv;else delete V[n.s];LS.set("pf",P);LS.set("vt",V);
+ toast(nv>0?"👍 سأعرض لك المزيد من هذا النوع":nv<0?"👎 سأقلّل هذا النوع":"تم إلغاء التقييم");R()}
+$("rs").onclick=()=>{if(confirm("مسح كل تفضيلاتك؟")){P={c:{},s:{},w:{}};V={};LS.set("pf",P);LS.set("vt",V);R()}};
+/* ===== المشاركة بالوسائط ===== */
+const FC={};
+const prox=u=>"https://images.weserv.nl/?url="+encodeURIComponent(u.replace(/^https?:\/\//,""))+"&w=1280&output=jpg";
+async function getFile(url,name,type){const r=await fetch(url);if(!r.ok)throw 0;const b=await r.blob();return new File([b],name,{type:b.type||type})}
+async function prep(n){if(FC[n.s])return FC[n.s];const f=[];
+ if(n.img){try{f.push(await getFile(prox(n.img),"news.jpg","image/jpeg"))}catch(e){}}
+ if(n.vid&&/\.mp4/i.test(n.vid)){try{const x=await getFile(n.vid,"news.mp4","video/mp4");if(x.size<45e6)f.push(x)}catch(e){}}
+ return FC[n.s]=f}
+function dl(f){const a=document.createElement("a");a.href=URL.createObjectURL(f);a.download=f.name;a.click()}
+async function shareFull(n,b){const text=msg(n),old="📤 مشاركة مع الصور والفيديو";
+ try{await navigator.clipboard.writeText(text)}catch(e){}
+ b.textContent="⏳ جارٍ تحميل الوسائط...";const files=await prep(n);
+ try{
+  if(files.length&&navigator.canShare&&navigator.canShare({files})){await navigator.share({files,text,title:n.t});toast("اختر واتساب ثم القروب. نُسخ نص الخبر؛ الصقه كتعليق إن لم يظهر",4500)}
+  else if(navigator.share){await navigator.share({text,title:n.t});if(!files.length)toast("لم تتوفر وسائط لهذا الخبر؛ أُرسل النص فقط",3500)}
+  else{open("https://wa.me/?text="+encodeURIComponent(text));files.forEach(dl);toast("نُزّلت الوسائط؛ أرفقها يدويًا في واتساب",4500)}
+ }catch(e){if(e&&e.name==="NotAllowedError"){b.textContent="👆 اضغط مرة أخرى للإرسال";return}if(!e||e.name!=="AbortError")toast("تعذّرت المشاركة")}
+ b.textContent=old}
+/* ===== العرض ===== */
 function R(){document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.k==cat));
 const q=$("q").value.trim(),L=$("l");L.innerHTML="";
-const a=D.filter(n=>(cat=="all"||n.c==cat)&&(!q||(n.t+n.b).includes(q)));
-if(!a.length){L.innerHTML='<div class="n">لا توجد أخبار</div>';return}
-a.forEach(n=>{const d=document.createElement("div");d.className="card";
+let a=D.filter(n=>(cat=="all"||n.c==cat)&&(!q||(n.t+n.b).includes(q))).map(n=>({n,sc:score(n)}));
+const hid=a.filter(x=>V[x.n.s]<0||x.sc<=-3);if(!showHid)a=a.filter(x=>!hid.includes(x));
+a.sort((x,y)=>(y.n.ts+y.sc*7200)-(x.n.ts+x.sc*7200));
+if(hid.length&&!showHid){const d=document.createElement("div");d.className="n";d.innerHTML=`أُخفي ${hid.length} خبر حسب تفضيلاتك `;const b=document.createElement("button");b.textContent="إظهارها";b.onclick=()=>{showHid=true;R()};d.append(b);L.append(d)}
+if(!a.length&&!hid.length){L.innerHTML='<div class="n">لا توجد أخبار</div>';return}
+a.forEach(({n})=>{const d=document.createElement("div");d.className="card";
 if(n.img){const i=document.createElement("img");i.src=n.img;i.loading="lazy";i.referrerPolicy="no-referrer";i.onerror=()=>i.remove();d.append(i)}
 const b=document.createElement("div");b.className="b";
 const m=document.createElement("div");m.className="m";m.textContent=`${C[n.c]} • ${n.src} • ${new Date(n.ts*1000).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})}`;
 const h=document.createElement("h2");h.textContent=n.t;const p=document.createElement("p");p.textContent=n.b;
-const r=document.createElement("div");r.className="r";
-const w=document.createElement("button");w.className="wa";w.textContent="📲 واتساب";w.onclick=()=>open("https://wa.me/?text="+encodeURIComponent(msg(n)));
-const c=document.createElement("button");c.className="cp";c.textContent="📋 نسخ";c.onclick=()=>navigator.clipboard.writeText(msg(n)).then(()=>c.textContent="✅ تم");
-const k=document.createElement("a");k.className="ln";k.href=n.vid||n.s;k.target="_blank";k.textContent=n.vid?"🎥 فيديو":"🔗 المصدر";
-r.append(w,c,k);b.append(m,h,p,r);d.append(b);L.append(d)})}
-async function load(){try{const j=await (await fetch("news.json?"+Date.now())).json();D=j.items;
-$("u").textContent=j.updated?"آخر تحديث: "+new Date(j.updated*1000).toLocaleString("ar-SA"):"بانتظار أول تحديث";R()}catch(e){$("l").innerHTML='<div class="n">تعذّر تحميل الأخبار</div>'}}
-load();setInterval(load,300000);
+const mk=(cls,txt,fn)=>{const x=document.createElement("button");x.className=cls;x.textContent=txt;x.onclick=()=>fn(x);return x};
+const r1=document.createElement("div");r1.className="r";
+r1.append(mk("wa","📲 نص فقط",()=>open("https://wa.me/?text="+encodeURIComponent(msg(n)))),
+ mk("cp","📋 نسخ",x=>navigator.clipboard.writeText(msg(n)).then(()=>x.textContent="✅ تم")));
+const k=document.createElement("a");k.className="ln";k.href=n.vid||n.s;k.target="_blank";k.textContent=n.vid?"🎥 فيديو":"🔗 المصدر";r1.append(k);
+const r2=document.createElement("div");r2.className="r";r2.append(mk("sh","📤 مشاركة مع الصور والفيديو",x=>shareFull(n,x)));
+const r3=document.createElement("div");r3.className="r";
+r3.append(mk("vt"+(V[n.s]>0?" on":""),"👍 اقتراح أكثر",()=>vote(n,1)),mk("vt"+(V[n.s]<0?" on":""),"👎 اقتراح أقل",()=>vote(n,-1)));
+b.append(m,h,p,r1,r2,r3);d.append(b);L.append(d)})}
+/* ===== التحديث والمؤقت ===== */
+async function load(manual){lastPoll=Date.now();
+ try{const j=await (await fetch("news.json?"+Date.now(),{cache:"no-store"})).json();
+  if(j.updated!==UP||!D.length){UP=j.updated;D=j.items;R();if(manual)toast("✅ تم تحميل أحدث الأخبار")}
+  else if(manual)toast("لا جديد بعد؛ الروبوت يحدّث كل 10 دقائق");
+  $("u").textContent=UP?"آخر تحديث: "+new Date(UP*1000).toLocaleString("ar-SA"):"بانتظار أول تحديث"}
+ catch(e){if(manual)toast("تعذّر التحميل")}}
+function tick(){if(!UP){$("tm").textContent="—";return}
+ const left=UP+600-Math.floor(Date.now()/1000);
+ if(left>0){$("tm").textContent="⏱ التحديث القادم بعد "+Math.floor(left/60)+":"+String(left%60).padStart(2,"0")}
+ else{$("tm").textContent="⏳ بانتظار التحديث...";if(Date.now()-lastPoll>20000)load(false)}}
+$("rf").onclick=()=>load(true);
+load(false);setInterval(tick,1000);
 </script></body></html>
