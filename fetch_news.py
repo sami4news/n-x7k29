@@ -4,8 +4,8 @@ from urllib.parse import quote
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone, timedelta
 
-def GN(q):
-    return "https://news.google.com/rss/search?q=" + quote(q + " when:1d") + "&hl=ar&gl=SA&ceid=SA:ar"
+def GN(q, days=1):
+    return "https://news.google.com/rss/search?q=" + quote(q + " when:%dd" % days) + "&hl=ar&gl=SA&ceid=SA:ar"
 
 # ("GN", عبارة بحث) = أخبار جوجل بحسب موضوع قروبك، وغيرها روابط RSS مباشرة
 FEEDS = [
@@ -15,6 +15,13 @@ FEEDS = [
  ("GN","إيران أمريكا إسرائيل تصعيد"),
  ("GN","مضيق هرمز"),
  ("GN","عاجل السعودية"),
+ # أخبار الطائف (نافذة 3 أيام لأن أخبارها أقل عددًا)
+ ("GT","الطائف"),
+ ("GT","أمانة الطائف"),
+ ("GT","محافظة الطائف"),
+ ("GT","الطائف أمطار"),
+ ("GT","جامعة الطائف"),
+ ("GT","إمارة منطقة مكة الطائف"),
  ("الجزيرة","https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdb83b6f7b8"),
  ("BBC عربي","https://feeds.bbci.co.uk/arabic/rss.xml"),
  ("سكاي نيوز عربية","https://www.skynewsarabia.com/web/rss"),
@@ -30,6 +37,8 @@ KW = {
  "eco": ["نفط","أسهم","الذهب","اقتصاد","بورصة","الدولار","أوبك","تضخم","الفائدة","الديزل","البنزين","ميزانية","أرامكو","استثمار"],
 }
 POL = ["رئيس","الرئيس","وزير","وزارة","حكومة","الحكومة","ترامب","بوتين","نتنياهو","بايدن","زيلينسكي","البيت الأبيض","الكرملين","الأمم المتحدة","مجلس الأمن","الناتو","الخارجية","سفارة","قنصلية","قمة","اتفاق","اتفاقية","مفاوضات","عقوبات","انتخابات","الجيش","قوات","قوة","سوريا","العراق","اليمن","مصر","الأردن","الكويت","الإمارات","قطر","البحرين","عُمان","تركيا","روسيا","الصين","أمريكا","أميركا","الولايات المتحدة","إسرائيل","فلسطين","غزة","لبنان","إيران","الخليج","مجلس التعاون","أوروبا","الاتحاد الأوروبي","هجوم","حادث","طائرة","انفجار","اعتقال","وفاة","مقتل","إصابة","ضحايا","أمن","أمني","الداخلية","الدفاع","طوارئ","زلزال","حريق","فيضانات","عاصفة"]
+# الطائف: كلمة كاملة حتى لا تلتقط "الطائفة/الطائفية"
+TAIF_RX = re.compile(r"(?<![\u0621-\u064A])(?:و|ب|ل|ف|ك)?(?:ال)?(?:طائف|الهدا|الحوية|ثقيف)(?![\u0621-\u064A])")
 ORDER = ["urgent","wx","war","sa","eco","me"]
 KW["me"] = POL
 
@@ -96,8 +105,8 @@ if __name__ == "__main__":
     items, seen = [], set()
     now = datetime.now(timezone.utc)
     for name, q in FEEDS:
-        gn = name == "GN"
-        url = GN(q) if gn else q
+        gn = name in ("GN","GT")
+        url = (GN(q, 3) if name == "GT" else GN(q)) if gn else q
         try:
             req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
             root = ET.fromstring(urllib.request.urlopen(req, timeout=25).read())
@@ -118,12 +127,13 @@ if __name__ == "__main__":
             try: d = parsedate_to_datetime(g("pubDate"))
             except Exception: d = now
             if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
-            if now - d > timedelta(hours=48): continue
+            tf = bool(TAIF_RX.search(title + " " + summ))
+            if now - d > timedelta(hours=72 if tf else 48): continue
             if len(title) < 28 or blocked(title, summ, link): continue
             cat = classify(title+" "+summ)
             if not cat: continue
             seen.add(key)
-            items.append({"t":title,"b":summ,"s":link,"src":src,"c":cat,
+            items.append({"t":title,"b":summ,"s":link,"src":src,"c":cat,"tf":tf,
                           "img":img_of(it),"vid":video_of(it),"ts":int(d.timestamp())})
     items.sort(key=lambda x:-x["ts"])
     from concurrent.futures import ThreadPoolExecutor

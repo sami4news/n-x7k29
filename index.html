@@ -34,7 +34,7 @@ input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);back
 <input id="q" placeholder="🔍 بحث في الأخبار">
 <div class="tabs" id="tabs"></div><div id="l"></div></div><div id="toast"></div>
 <script>
-const C={all:"🗂️ الكل",urgent:"🚨 عاجل",wx:"🌧️ أرصاد وإنذارات",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد"};
+const C={all:"🗂️ الكل",taif:"🏔️ الطائف",urgent:"🚨 عاجل",wx:"🌧️ أرصاد وإنذارات",sa:"🇸🇦 السعودية",me:"🌍 الشرق الأوسط والعالم",war:"⚔️ الحروب",eco:"💰 اقتصاد"};
 const REPO="sami4news/n-x7k29";
 const $=i=>document.getElementById(i),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let D=[],cat="all",UP=0,lastPoll=0,showHid=false,busy=false,lastAuto=0;
@@ -82,7 +82,7 @@ async function shareFull(n,b,chip){const text=n.t,old="📤 مشاركة بال�
 /* ===== العرض ===== */
 function R(){document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.k==cat));
 const q=$("q").value.trim(),L=$("l");L.innerHTML="";
-let a=D.filter(n=>(cat=="all"||n.c==cat)&&(!q||(n.t+n.b).includes(q))).map(n=>({n,sc:score(n)}));
+let a=D.filter(n=>(cat=="all"||(cat=="taif"?n.tf:n.c==cat))&&(!q||(n.t+n.b).includes(q))).map(n=>({n,sc:score(n)}));
 const hid=a.filter(x=>V[x.n.s]<0||x.sc<=-3);if(!showHid)a=a.filter(x=>!hid.includes(x));
 a.sort((x,y)=>(y.n.ts+y.sc*7200)-(x.n.ts+x.sc*7200));
 if(hid.length&&!showHid){const d=document.createElement("div");d.className="n";d.innerHTML=`أُخفي ${hid.length} خبر حسب تفضيلاتك `;const b=document.createElement("button");b.textContent="إظهارها";b.onclick=()=>{showHid=true;R()};d.append(b);L.append(d)}
@@ -112,15 +112,17 @@ async function load(manual){lastPoll=Date.now();
   if(j.updated!==UP||!D.length){UP=j.updated;D=j.items;R();hdr();if(manual)toast("✅ تم تحميل أحدث الأخبار")}
   else if(manual)toast("لا جديد بعد في الأخبار المحفوظة")}
  catch(e){if(manual)toast("تعذّر التحميل")}}
-async function dispatch(){const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/update.yml/dispatches`,{method:"POST",headers:{Authorization:"Bearer "+tok(),Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify({ref:"main"})});return r.status}
+async function dispatch(){const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/update.yml/dispatches`,{method:"POST",headers:{Authorization:"Bearer "+tok(),Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify({ref:"main"})});let m="";if(r.status!==204){try{m=(await r.json()).message||""}catch(e){}}return{st:r.status,m}}
 function setKey(){const t=prompt("الصق رمز GitHub (Fine-grained token بصلاحية Actions: Read and write على مستودع الأخبار فقط).\nيُحفظ في متصفحك فقط. اترك الخانة فارغة لحذف الرمز المحفوظ.");
  if(t===null)return false;LS.set("gt",t.trim());toast(t.trim()?"✅ تم حفظ الرمز":"تم حذف الرمز");return !!t.trim()}
 async function forceRefresh(auto){if(busy)return;
  if(!tok()){if(auto)return;toast("للتحديث الفوري اربط الرمز أولًا (زر 🔑)؛ سأحمّل المحفوظ الآن");await load(true);return}
  busy=true;$("rf").textContent="⏳ جارٍ التحديث...";
- let st=0;try{st=await dispatch()}catch(e){}
- if(st!==204){busy=false;$("rf").textContent="🔄 تحديث الآن";
-  if([401,403,404].includes(st)){LS.set("gt","");toast("الرمز غير صالح أو ينقصه صلاحية Actions. اربطه من جديد (🔑)",5500)}else toast("تعذّر تشغيل التحديث");return}
+ let res={st:0,m:""};try{res=await dispatch()}catch(e){res.m=String(e)}
+ if(res.st!==204){busy=false;$("rf").textContent="🔄 تحديث الآن";
+  const why={401:"الرمز خاطئ أو منتهي أو فيه نسخ ناقص",403:"الرمز لا يملك صلاحية Actions: Read and write",404:"الرمز لا يشمل مستودع n-x7k29 أو الملف update.yml غير موجود",422:"ملف update.yml ينقصه workflow_dispatch"}[res.st]||"سبب غير معروف";
+  if(res.st===401)LS.set("gt","");
+  alert("تعذّر تشغيل التحديث\nرمز الخطأ: "+res.st+"\nالسبب المرجّح: "+why+"\nرسالة GitHub: "+res.m);return}
  toast("⏳ بدأ الجلب من المصادر... يستغرق نحو دقيقة",4000);
  const prev=UP,t0=Date.now();
  while(Date.now()-t0<180000){await sleep(8000);try{const j=await fetchJSON();if(j.updated!==prev){UP=j.updated;D=j.items;R();hdr();toast("✅ تم التحديث");break}}catch(e){}}
