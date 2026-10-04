@@ -101,43 +101,143 @@ def enrich(it):
     if og: it["img"] = og  # صورة الصفحة أعلى جودة من مصغّرة RSS
     if not it["vid"]: it["vid"] = meta(h, "og:video:secure_url") or meta(h, "og:video")
 
+
+# ===== تطبيع النص العربي =====
+_MAP = str.maketrans("أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩", "اااايهوي0123456789")
+def norm(s):
+    s = re.sub(r"[\u064B-\u0652\u0640]", "", (s or "").lower())
+    return s.translate(_MAP)
+
+STOP = set(norm(w) for w in "في على من الى إلى عن مع بعد قبل بين خلال حول ضد هذا هذه ذلك التي الذي الذين قال قالت يقول ان إن كان كانت لا لم لن قد تم يتم ثم او أو كما حتى عند منذ بسبب نحو اثر إثر بشأن لدى اليوم امس غدا كل عدة اكثر بعض وفق حسب بحسب".split())
+
+def sig(title):
+    out = set()
+    for w in re.findall(r"[\u0621-\u064A0-9a-z]+", norm(title)):
+        if w.isdigit(): out.add(w); continue   # الأرقام تُحفظ مهما قصرت (للتفريق بين إنذار 25 وإنذار 26)
+        w = re.sub(r"^(وال|بال|لل|فال|كال|ال)", "", w)
+        if len(w) > 3: w = re.sub(r"[اه]$", "", w)
+        if len(w) >= 3 and w not in STOP: out.add(w)
+    return out
+
+def same_story(a, b):
+    """هل العنوانان لنفس الخبر؟ تشابه كلمات + حارس أرقام + حارس زمن"""
+    if abs(a["ts"] - b["ts"]) > 10 * 3600: return False
+    A, B = a["sig"], b["sig"]
+    if not A or not B: return False
+    na = {w for w in A if w.isdigit()}; nb = {w for w in B if w.isdigit()}
+    if na and nb and na != nb: return False   # تواريخ/أعداد مختلفة = خبر مختلف
+    inter = len(A & B)
+    if inter < 3: return False
+    jac = inter / len(A | B)
+    ovl = inter / min(len(A), len(B))
+    return jac >= 0.5 or (ovl >= 0.8 and inter >= 4)
+
+# ===== موثوقية المصدر =====
+def canon(name):
+    n = norm(name)
+    n = re.sub(r"^(صحيفه|جريده|موقع|قناه|وكاله|شبكه|بوابه|مجله)\s+", "", n)
+    return re.sub(r"[\s\.\-_]*(نت|\.com|\.net)$", "", n).strip()
+
+def _m(n, key):
+    return n == key or n.startswith(key + " ") or n.startswith(key + ".")
+
+OFFICIAL = ["واس", "الانباء السعوديه", "الاخباريه", "الاخبارية", "وزاره", "الدفاع المدني", "المركز الوطني", "الارصاد",
+            "الامن العام", "المرور", "مرور", "شرطه", "الجوازات", "الهلال الاحمر", "هيئه", "امانه", "اماره", "جامعه", "spa", "saudi press agency"]
+TRUSTED = ["العربيه", "الحدث", "الجزيره", "الجزيره نت", "bbc", "سكاي نيوز", "الشرق الاوسط", "فرانس 24", "france 24", "رويترز",
+           "reuters", "الشرق", "اندبندنت", "independent", "cnn", "عكاظ", "الرياض", "الوطن", "المدينه", "اليوم", "سبق",
+           "الاقتصاديه", "اخبار 24", "الانباء", "الاناضول", "anadolu", "فرانس برس", "afp", "associated press", "الاتحاد",
+           "البيان", "الخليج", "القبس", "الراي", "دويتشه فيله", "dw", "al arabiya", "al jazeera", "aljazeera", "sky news",
+           "asharq", "the national", "arab news", "عرب نيوز", "saudi gazette", "okaz", "اقتصاد الشرق"]
+OFF_N = [norm(x) for x in OFFICIAL]
+TRU_N = [norm(x) for x in TRUSTED]
+
+def trust(name):
+    """2 = رسمي، 1 = موثوق، 0 = غير معروف"""
+    n = canon(name)
+    if any(_m(n, k) for k in OFF_N): return 2
+    if any(_m(n, k) for k in TRU_N): return 1
+    return 0
+
+def cat_rank(c): return ORDER.index(c) if c in ORDER else 99
+
+def cluster(cands):
+    """يدمج الأخبار المتشابهة في بطاقة واحدة مع عدّ المصادر المختلفة"""
+    cands.sort(key=lambda x: -x["ts"])
+    groups = []
+    for c in cands:
+        for g in groups:
+            if any(same_story(c, m) for m in g):
+                g.append(c); break
+        else:
+            groups.append([c])
+    out = []
+    for g in groups:
+        rep = max(g, key=lambda x: (x["tr"] * 3 + (2 if x["img"] else 0) + (1 if x["b"] else 0) + (1 if x["vid"] else 0), x["ts"]))
+        seen_src, srcs, alts = set(), [], []
+        for m in sorted(g, key=lambda x: (-x["tr"], -x["ts"])):
+            cs = canon(m["src"])
+            if cs in seen_src: continue
+            seen_src.add(cs); srcs.append(m["src"])
+            if m is not rep and len(alts) < 6: alts.append({"src": m["src"], "s": m["s"]})
+        it = {k: v for k, v in rep.items() if k != "sig"}
+        if not it["img"]:
+            for m in g:
+                if m["img"]: it["img"], it["vid"] = m["img"], it["vid"] or m["vid"]; break
+        it["c"] = min((m["c"] for m in g), key=cat_rank)
+        it["tf"] = any(m["tf"] for m in g)
+        it["tr"] = max(m["tr"] for m in g)
+        it["n"] = len(seen_src)
+        it["srcs"] = srcs[:8]
+        it["alts"] = alts
+        out.append(it)
+    return out
+
 if __name__ == "__main__":
-    items, seen = [], set()
+    cands, links = [], set()
     now = datetime.now(timezone.utc)
     for name, q in FEEDS:
-        gn = name in ("GN","GT")
+        gn = name in ("GN", "GT")
         url = (GN(q, 3) if name == "GT" else GN(q)) if gn else q
         try:
-            req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             root = ET.fromstring(urllib.request.urlopen(req, timeout=25).read())
         except Exception as e:
             print("FAIL", name, q[:40], e); continue
         for it in root.iter("item"):
             g = lambda k: (it.findtext(k) or "")
             title, link = clean(g("title")), g("link").strip()
-            if not title or not link: continue
+            if not title or not link or link in links: continue
             src, summ = name, clean(g("description"))[:240]
             if gn:
                 summ = ""
                 if " - " in title: title, src = title.rsplit(" - ", 1)
-            cats = " ".join((c.text or "") for c in it.findall("category"))
-            if len(title) < 25 or "؟" in title or re.match(r"^\d+\s", title): continue
-            key = re.sub(r"\W+","",title)[:35]
-            if key in seen: continue
+            src = src.strip()
+            if len(title) < 28 or "؟" in title or re.match(r"^\d+\s", title): continue
             try: d = parsedate_to_datetime(g("pubDate"))
             except Exception: d = now
             if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
             tf = bool(TAIF_RX.search(title + " " + summ))
             if now - d > timedelta(hours=72 if tf else 48): continue
-            if len(title) < 28 or blocked(title, summ, link): continue
-            cat = classify(title+" "+summ)
+            if blocked(title, summ, link): continue
+            cat = classify(title + " " + summ)
             if not cat: continue
-            seen.add(key)
-            items.append({"t":title,"b":summ,"s":link,"src":src,"c":cat,"tf":tf,
-                          "img":img_of(it),"vid":video_of(it),"ts":int(d.timestamp())})
-    items.sort(key=lambda x:-x["ts"])
+            links.add(link)
+            cands.append({"t": title, "b": summ, "s": link, "src": src, "c": cat, "tf": tf,
+                          "img": img_of(it), "vid": video_of(it), "ts": int(d.timestamp()),
+                          "tr": trust(src), "sig": sig(title)})
+    items = cluster(cands)
+    items.sort(key=lambda x: -x["ts"])
+    items = items[:200]
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(8) as ex:
-        list(ex.map(enrich, [i for i in items if "news.google.com" not in i["s"]][:60]))
-    json.dump({"updated":int(time.time()),"items":items[:200]}, open("news.json","w",encoding="utf-8"), ensure_ascii=False)
-    print("items:", len(items))
+        list(ex.map(enrich, [i for i in items if not i["img"] and "news.google.com" not in i["s"]][:60]))
+    if not items:
+        # حماية: إذا تعطلت المصادر كلها لا نفرّغ الموقع، نبقي آخر أخبار سليمة
+        try:
+            old = json.load(open("news.json", encoding="utf-8"))
+            if old.get("items"):
+                print("لا أخبار جديدة (تعطل المصادر؟) — أُبقي على الملف السابق"); raise SystemExit(0)
+        except (OSError, ValueError):
+            pass
+    json.dump({"updated": int(time.time()), "items": items}, open("news.json", "w", encoding="utf-8"), ensure_ascii=False)
+    print("candidates:", len(cands), "-> cards:", len(items), "| multi-source:", sum(1 for i in items if i["n"] > 1))
