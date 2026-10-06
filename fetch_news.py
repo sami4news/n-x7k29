@@ -78,10 +78,14 @@ UA = {"User-Agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36
       "Accept": "text/html,application/xhtml+xml,*/*;q=0.8", "Accept-Language": "ar,en;q=0.7"}
 JUNK_IMG = re.compile(r"(logo|icon|favicon|sprite|avatar|placeholder|blank|pixel|spacer|1x1|loader|emoji|watermark|"
                       r"default[-_]?(share|image|og|thumb)|no[-_]?image|\.svg|\.gif|\.ico)(\b|[-_./?]|$)", re.I)
+UA_FB = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+UA_TW = "Twitterbot/1.0"
 GN_HOSTS = ("news.google.com", "google.com/rss", "lh3.googleusercontent.com")
 
-def http_get(url, limit=600_000, timeout=10):
-    req = urllib.request.Request(url, headers=UA)
+def http_get(url, limit=600_000, timeout=10, ua=None):
+    hd = dict(UA)
+    if ua: hd["User-Agent"] = ua
+    req = urllib.request.Request(url, headers=hd)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw, ctype, final = r.read(limit), r.headers.get("Content-Type", ""), r.geturl()
     if raw[:2] == b"\x1f\x8b":
@@ -214,16 +218,31 @@ def video_of(it):
 
 # --- فكّ رابط أخبار جوجل ---
 _DEC = threading.Semaphore(3)
+def resolve_gn_http(link):
+    """احتياط: بعض روابط جوجل القديمة تحوّل مباشرة إلى الناشر"""
+    try:
+        req = urllib.request.Request(link + ("&" if "?" in link else "?") + "oc=5", headers=UA)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            fin = r.geturl(); body = r.read(300_000).decode("utf-8", "replace")
+        if "google." not in urlparse(fin).netloc: return fin
+        m = re.search(r'data-n-au=["\']([^"\']+)', body)
+        if m: return html.unescape(m.group(1))
+    except Exception:
+        pass
+    return ""
+
 def resolve_gn(link):
-    if gnewsdecoder is None or "news.google.com" not in link: return ""
+    if "news.google.com" not in link: return ""
+    if gnewsdecoder is None: return resolve_gn_http(link)
     with _DEC:
         for kw in ({"interval": None, "timeout": 10}, {"interval": None}):
             try:
                 r = gnewsdecoder(link, **kw)
-                return r["decoded_url"] if isinstance(r, dict) and r.get("success") else ""
+                if isinstance(r, dict) and r.get("success"): return r["decoded_url"]
+                break
             except TypeError: continue
-            except Exception: return ""
-    return ""
+            except Exception: break
+    return resolve_gn_http(link)
 
 def enrich(it, deadline):
     """يكمّل الخبر: رابط المصدر الحقيقي + الصور + الفيديو. نتائجه تُحفظ فلا تُعاد في كل تشغيل"""
@@ -238,11 +257,14 @@ def enrich(it, deadline):
     rss_img = it.get("img") or ""
     imgs, vids = [], []
     if page:
-        try:
-            h, final = http_get(page)
-            imgs, vids = media_from_html(h, final or page)
-        except Exception as e:
-            it["err"] = str(e)[:60]
+        for ua in (None, UA_FB, UA_TW):   # بعض المواقع تحجب المتصفح من الخوادم لكن تسمح لزاحفات المعاينة (فيسبوك/تويتر)
+            try:
+                h, final = http_get(page, ua=ua)
+                imgs, vids = media_from_html(h, final or page)
+                it.pop("err", None)
+                if imgs: break
+            except Exception as e:
+                it["err"] = str(e)[:60]
     if rss_img and rss_img.split("?")[0] not in [x.split("?")[0] for x in imgs]: imgs.append(rss_img)
     if it.get("vid") and it["vid"] not in [v["u"] for v in vids]: vids.insert(0, {"u": it["vid"], "k": vkind(it["vid"])})
     it["imgs"], it["vids"] = imgs[:4], vids[:4]
@@ -308,9 +330,49 @@ def mp4_dims(data):
         pass
     return 0, 0
 
+def img_dims(d):
+    """(الامتداد، (العرض، الارتفاع)) من ترويسة الصورة مباشرة — احتياط إن لم تتوفر مكتبة Pillow"""
+    try:
+        if d[:8] == b"\x89PNG\r\n\x1a\n": return "png", struct.unpack(">II", d[16:24])
+        if d[:3] == b"\xff\xd8\xff":
+            i = 2
+            while i + 9 < len(d):
+                if d[i] != 0xFF: i += 1; continue
+                m = d[i + 1]
+                if m in (0xD8, 0x01) or 0xD0 <= m <= 0xD7: i += 2; continue
+                ln = struct.unpack(">H", d[i + 2:i + 4])[0]
+                if 0xC0 <= m <= 0xCF and m not in (0xC4, 0xC8, 0xCC):
+                    h, w = struct.unpack(">HH", d[i + 5:i + 9]); return "jpg", (w, h)
+                i += 2 + ln
+        if d[:4] == b"RIFF" and d[8:12] == b"WEBP":
+            t = d[12:16]
+            if t == b"VP8X": return "webp", (int.from_bytes(d[24:27], "little") + 1, int.from_bytes(d[27:30], "little") + 1)
+            if t == b"VP8 ": w, h = struct.unpack("<HH", d[26:30]); return "webp", (w & 0x3fff, h & 0x3fff)
+            if t == b"VP8L":
+                b = struct.unpack("<I", d[21:25])[0]; return "webp", ((b & 0x3fff) + 1, ((b >> 14) & 0x3fff) + 1)
+    except Exception:
+        pass
+    return None, (0, 0)
+
+def save_image_raw(url, referer=""):
+    try: data = fetch_bytes(url, MAX_IMG_BYTES, referer=referer)
+    except Exception: return None, "fail"
+    ext, (w, h) = img_dims(data)
+    if not ext or not w or not h: return None, "fail"
+    if min(w, h) < MIN_SIDE or max(w, h) / max(1, min(w, h)) > MAX_RATIO: return None, "small"
+    fname = fid("i", url, ext); path = os.path.join(MEDIA_DIR, fname)
+    if not os.path.exists(path):
+        tmp = "%s.%d.part" % (path, threading.get_ident())
+        try:
+            with open(tmp, "wb") as f: f.write(data)
+            os.replace(tmp, path)
+        except Exception:
+            return None, "fail"
+    return {"t": "i", "f": fname, "o": url, "w": w, "h": h, "b": len(data)}, "ok"
+
 def save_image(url, referer=""):
     """يعيد (مدخل الوسائط أو None، الحالة: ok/small/fail). يصغّر العريض جدًا ويحوّله JPEG"""
-    if Image is None: return None, "fail"
+    if Image is None: return save_image_raw(url, referer)
     try:
         data = fetch_bytes(url, MAX_IMG_BYTES, referer=referer)
         im = Image.open(io.BytesIO(data)); im.load()
@@ -509,7 +571,7 @@ def cluster(cands):
             groups.append([c])
     out = []
     for g in groups:
-        rep = max(g, key=lambda x: (x["tr"] * 3 + (2 if x["img"] else 0) + (1 if x["b"] else 0) + (1 if x["vid"] else 0), x["ts"]))
+        rep = max(g, key=lambda x: (x["tr"] * 3 + (0 if "news.google.com" in x["s"] else 2) + (2 if x["img"] else 0) + (1 if x["b"] else 0) + (1 if x["vid"] else 0), x["ts"]))
         seen_src, srcs, alts = set(), [], []
         for m in sorted(g, key=lambda x: (-x["tr"], -x["ts"])):
             cs = canon(m["src"])
@@ -530,15 +592,89 @@ def cluster(cands):
     return out
 
 RIY = timezone(timedelta(hours=3))
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+def atom_get(it, k):
+    if k == "link":
+        ls = it.findall(ATOM + "link")
+        for l in ls:
+            if l.get("rel", "alternate") == "alternate" and l.get("href"): return l.get("href")
+        return ls[0].get("href", "") if ls else ""
+    if k == "pubDate": return it.findtext(ATOM + "published") or it.findtext(ATOM + "updated") or ""
+    if k == "description": return it.findtext(ATOM + "summary") or it.findtext(ATOM + "content") or ""
+    return it.findtext(ATOM + k) or ""
+
+def parse_dt(s, now):
+    try: d = parsedate_to_datetime(s)
+    except Exception:
+        try: d = datetime.fromisoformat(s.strip().replace("Z", "+00:00"))
+        except Exception: d = now
+    if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
+    return d
+
+# مصادر مباشرة (RSS/Atom): تحمل الصور غالبًا في الخلاصة نفسها، فلا نعتمد على روابط جوجل المشفّرة.
+# يكتشف الروبوت رابط الخلاصة تلقائيًا من الصفحة الرئيسية ويحفظه في news.json (feeds) ويعيد المحاولة دوريًا
+DIRECT = [("رؤيا الإخباري", "royanews.tv"), ("صحيفة سبق الإلكترونية", "sabq.org"), ("واس", "spa.gov.sa"), ("عكاظ", "okaz.com.sa"),
+          ("الرياض", "alriyadh.com"), ("جريدة المدينة", "al-madina.com"), ("اليوم", "alyaum.com"), ("الوطن", "alwatan.com.sa"),
+          ("الاقتصادية", "aleqt.com"), ("أرقام", "argaam.com")]
+KNOWN_FEED = {"royanews.tv": "https://royanews.tv/rss"}
+
+def feed_ok(url):
+    try:
+        raw = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15).read(2_500_000)
+        root = ET.fromstring(raw)
+        return bool(list(root.iter("item")) or list(root.iter(ATOM + "entry")))
+    except Exception:
+        return False
+
+def discover(dom, cache):
+    c = cache.get(dom) or {}
+    if c and time.time() - c.get("t", 0) < (86400 if c.get("u") else 6 * 3600):
+        return c.get("u", "")
+    cands = [KNOWN_FEED[dom]] if dom in KNOWN_FEED else []
+    for page in ("https://%s/" % dom, "https://www.%s/" % dom, "https://%s/rss" % dom):
+        try:
+            h, final = http_get(page, limit=400_000)
+        except Exception:
+            continue
+        for t in re.findall(r"<link\b[^>]*>", h, re.I):
+            if re.search(r'type=["\']application/(rss|atom)\+xml', t, re.I):
+                hr = re.search(r'href=["\']([^"\']+)', t, re.I)
+                if hr: cands.append(urljoin(final, html.unescape(hr.group(1))))
+        for hr in re.findall(r'href=["\']([^"\'#]*(?:rss|feed|\.xml)[^"\'#]*)', h, re.I)[:8]:
+            if not re.search(r"\.(jpe?g|png|webp|gif|css|js)(\?|$)", hr, re.I): cands.append(urljoin(final, html.unescape(hr)))
+    base = "https://%s" % dom
+    cands += [base + x for x in ("/rss", "/feed", "/rss.xml", "/feed/", "/rss/latest", "/rss/news", "/ar/rss")]
+    seen, url = set(), ""
+    for u in cands:
+        if u in seen or "comment" in u.lower(): continue
+        seen.add(u)
+        if feed_ok(u): url = u; break
+    cache[dom] = {"u": url, "t": int(time.time())}
+    return url
 
 def link_keys(it):
     ks = [it.get("g"), it.get("s"), it.get("u")] + [a.get("s") for a in it.get("alts", [])]
     return [k for k in ks if k]
 
 def run(feeds=None, out="news.json", max_enrich=70, budget=150):
-    feeds = feeds or FEEDS
+    use_direct = feeds is None
+    feeds = list(feeds or FEEDS)
     cands, links = [], set()
     now = datetime.now(timezone.utc)
+    try: old0 = json.load(open(out, encoding="utf-8"))
+    except Exception: old0 = {}
+    fcache = dict(old0.get("feeds") or {})
+    if use_direct:
+        from concurrent.futures import ThreadPoolExecutor
+        def _safe(nd):
+            try: return discover(nd[1], fcache)
+            except Exception: return ""
+        with ThreadPoolExecutor(5) as ex:
+            urls = list(ex.map(_safe, DIRECT))
+        for (nm, dom), u in zip(DIRECT, urls):
+            if u: feeds.append((nm, u))
+        print("direct feeds:", {dom: bool(u) for (nm, dom), u in zip(DIRECT, urls)})
     for name, q in feeds:
         gn = name in ("GN", "GT")
         url = (GN(q, 3) if name == "GT" else GN(q)) if gn else q
@@ -547,8 +683,9 @@ def run(feeds=None, out="news.json", max_enrich=70, budget=150):
             root = ET.fromstring(urllib.request.urlopen(req, timeout=25).read())
         except Exception as e:
             print("FAIL", name, q[:40], e); continue
-        for it in root.iter("item"):
-            g = lambda k: (it.findtext(k) or "")
+        for it in list(root.iter("item")) + list(root.iter(ATOM + "entry")):
+            atom = it.tag == ATOM + "entry"
+            g = (lambda k, it=it: atom_get(it, k)) if atom else (lambda k, it=it: (it.findtext(k) or ""))
             title, link = clean(g("title")), g("link").strip()
             if not title or not link or link in links: continue
             src, summ = name, clean(g("description"))[:240]
@@ -557,9 +694,7 @@ def run(feeds=None, out="news.json", max_enrich=70, budget=150):
                 if " - " in title: title, src = title.rsplit(" - ", 1)
             src = src.strip()
             if len(title) < 28 or "؟" in title or re.match(r"^\d+\s", title): continue
-            try: d = parsedate_to_datetime(g("pubDate"))
-            except Exception: d = now
-            if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
+            d = parse_dt(g("pubDate"), now)
             tf = bool(TAIF_RX.search(title + " " + summ))
             if now - d > timedelta(hours=72 if tf else 48): continue
             if blocked(title, summ, link): continue
@@ -630,7 +765,8 @@ def run(feeds=None, out="news.json", max_enrich=70, budget=150):
             "yt": sum(1 for i in items for m in i.get("media", []) if m["t"] == "y"),
             "media_mb": round(pst["bytes"] / 1e6, 1), "mst": mst}
     top = dict(sorted(stats.items(), key=lambda kv: -kv[1][0])[:30])
-    json.dump({"updated": int(time.time()), "seq": seq, "info": info, "stats": top, "items": items},
+    info["feeds"] = {k: bool(v.get("u")) for k, v in fcache.items()}
+    json.dump({"updated": int(time.time()), "seq": seq, "feeds": fcache, "info": info, "stats": top, "items": items},
               open(out, "w", encoding="utf-8"), ensure_ascii=False)
     print("candidates:", len(cands), "-> cards:", len(items), "| multi-source:", sum(1 for i in items if i["n"] > 1))
     print("hosted: images %(hosted_img)d | videos %(hosted_vid)d | youtube %(yt)d | %(media_mb)s MB | " % info, info["mst"])
