@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: install
-        run: pip install pillow googlenewsdecoder
+        run: pip install pillow googlenewsdecoder "selectolax<1.0"
 
       - name: restore media
         run: |
