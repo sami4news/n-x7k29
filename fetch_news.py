@@ -719,8 +719,8 @@ def run(feeds=None, out="news.json", max_enrich=70, budget=150):
     for it in items:
         o = next((idx[k] for k in link_keys(it) if k in idx), None)
         if not o: continue
-        for f in ("no", "nd", "a", "u", "g", "imgs", "vids", "err", "media", "mt"):
-            if f in o: it[f] = o[f]
+        for f in ("no", "nd", "gr", "a", "u", "g", "imgs", "vids", "err", "media", "mt"):
+            if f in o and (f not in ("no", "nd") or o.get("gr")): it[f] = o[f]   # ترقيم قديم (عام) بلا قسم: يُعاد ترقيمه
         if o.get("g"):   # الخبر سبق فكّ رابطه: نحتفظ بالرابط الحقيقي
             it["s"], it["g"] = o["s"], o["g"]
         if "imgs" in o: it["img"], it["vid"] = o.get("img", ""), o.get("vid", "")
@@ -747,11 +747,14 @@ def run(feeds=None, out="news.json", max_enrich=70, budget=150):
             print("لا أخبار جديدة (تعطل المصادر؟) — أُبقي على الملف السابق"); return
     # --- الترقيم: يبدأ من 1 كل يوم (بتوقيت الرياض) ---
     today = datetime.now(RIY).strftime("%Y-%m-%d")
+    # لكل قسم ترقيمه المستقل (الطائف قسم قائم بذاته)، يبدأ من 1 كل يوم، والأحدث يأخذ الرقم الأكبر
     seq = old.get("seq") or {}
-    if seq.get("day") != today: seq = {"day": today, "next": 1}
-    for it in sorted([i for i in items if not i.get("no")], key=lambda x: x["ts"]):
-        it["no"], it["nd"] = seq["next"], today
-        seq["next"] += 1
+    if seq.get("day") != today or not isinstance(seq.get("next"), dict): seq = {"day": today, "next": {}}
+    for it in sorted([i for i in items if not (i.get("no") and i.get("gr"))], key=lambda x: x["ts"]):
+        g = it.get("gr") or ("taif" if it.get("tf") else it["c"])
+        it["gr"] = g
+        it["no"], it["nd"] = seq["next"].get(g, 1), today
+        seq["next"][g] = it["no"] + 1
     # --- إحصاءات تشخيصية تظهر في الموقع ---
     stats = {}
     for it in items:
