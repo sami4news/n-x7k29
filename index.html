@@ -76,9 +76,9 @@ input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--bd);back
 .pg .pcol{flex:1;min-width:0;overflow:hidden}.pg .pcol+.pcol{border-inline-start:1px solid #14141466;padding-inline-start:14px;margin-inline-start:14px}
 .pg .st{margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #14141433}
 .pg .st h3{margin:4px 0;font-size:16.5px;line-height:1.5}.pg .st p{margin:0 0 4px;font-size:13px;line-height:1.65;color:#2a2a2a}
-.pg .si{height:118px;background-size:cover;background-position:center;border:1px solid #14141455}
+.pg .si{border:1px solid #14141455;background:#fff}
 .pg .sm{font-size:11px;color:#555}
-.pg .ld{border-bottom:3px solid #141414;margin-bottom:12px}.pg .ld .si{height:250px}.pg .ld h3{font-size:25px;line-height:1.45}.pg .ld p{font-size:14.5px}
+.pg .ld{border-bottom:3px solid #141414;margin-bottom:12px}.pg .ld h3{font-size:25px;line-height:1.45}.pg .ld p{font-size:14.5px}
 .pg .pft{text-align:center;font-size:11px;color:#555;border-top:1px solid #14141466;padding-top:5px;margin-top:6px}
 
 .bar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -283,7 +283,7 @@ function npAsk(){const bx=pmBox();bx.innerHTML="";
 async function npImages(S){const M=new Map();let k=0;
  const work=async n=>{const e=mediaOf(n).find(x=>x.t==="i");if(!e)return;
   for(const u of urlsOf(e)){const b=await fetchBlob(u,9000);if(!b||b.size<1500||!b.type.startsWith("image/"))continue;
-   try{const bm=await createImageBitmap(b),sc=Math.min(1,900/bm.width),c=document.createElement("canvas");c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);c.getContext("2d").drawImage(bm,0,0,c.width,c.height);M.set(n,c.toDataURL("image/jpeg",.85));return}catch(x){}}};
+   try{const bm=await createImageBitmap(b),sc=Math.min(1,900/bm.width),c=document.createElement("canvas");c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);c.getContext("2d").drawImage(bm,0,0,c.width,c.height);M.set(n,{u:c.toDataURL("image/jpeg",.85),w:c.width,h:c.height});return}catch(x){}}};
  const q=S.filter(n=>mediaOf(n).some(e=>e.t==="i")).slice(0,26);
  await Promise.all(Array.from({length:6},async()=>{while(k<q.length)await work(q[k++])}));return M}
 function npLayout(S,IMG){const host=$("nph");host.innerHTML="";
@@ -296,15 +296,21 @@ function npLayout(S,IMG){const host=$("nph");host.innerHTML="";
   else{const h=el("div","sh2");h.append(el("b","","+HOME I PLUS · "+sec),el("span","",dt));pg.append(h)}
   const bd=el("div","pbd"),c1=el("div","pcol"),c2=el("div","pcol");bd.append(c1,c2);pg.append(bd,el("div","pft",""));host.append(pg);pages.push(pg);return{pg,bd,cols:[c1,c2]}};
  const story=(n,big)=>{const a=el("div","st"+(big?" ld":""));
-  if(IMG.get(n)){const im=el("div","si");im.style.backgroundImage="url("+IMG.get(n)+")";a.append(im)}
+  const I=IMG.get(n);   // الصورة كاملة دائمًا بنسبتها الأصلية (بلا قصّ)، والطويلة جدًا تُصغَّر لتتّسع
+  if(I){const cw=big?726:330,mh=big?470:400;let w=cw,h=Math.round(cw*I.h/I.w);if(h>mh){h=mh;w=Math.round(mh*I.w/I.h)}
+   const im=el("img","si");im.src=I.u;im.width=w;im.height=h;im.style.cssText="display:block;margin:0 auto 4px;width:"+w+"px;height:"+h+"px";a.append(im)}
   a.append(el("h3","",n.t));if(n.b)a.append(el("p","",cutT(n.b,big?330:150)));
   a.append(el("div","sm",n.src+((n.n||1)>1?" +"+((n.n||1)-1)+" مصادر":"")+" · "+hm(n.ts)+(n.no?" · "+(C[gr(n)]||"").replace(/^\S+\s*/,"")+" #"+n.no:"")));return a};
  const lead=S.find(n=>IMG.get(n))||S[0],rest=S.filter(n=>n!==lead);
  let cur=mk(true);cur.pg.insertBefore(story(lead,true),cur.bd);
  const used=c=>[...c.children].reduce((s,e)=>s+e.offsetHeight+14,0),fits=c=>c.scrollHeight<=c.clientHeight+1;
- for(const n of rest){const e=story(n,false),ord=used(cur.cols[0])<=used(cur.cols[1])?[0,1]:[1,0];let ok=false;
-  for(const k of ord){cur.cols[k].append(e);if(fits(cur.cols[k])){ok=true;break}e.remove()}
-  if(!ok){cur=mk(false);cur.cols[0].append(e)}}
+ let rem=rest.slice();   // نملأ فراغات الصفحة بأخبار لاحقة أصغر قبل فتح صفحة جديدة
+ while(rem.length){const left=[];
+  for(const n of rem){const e=story(n,false),ord=used(cur.cols[0])<=used(cur.cols[1])?[0,1]:[1,0];let ok=false;
+   for(const k of ord){cur.cols[k].append(e);if(fits(cur.cols[k])){ok=true;break}e.remove()}
+   if(!ok&&!cur.cols[0].children.length&&!cur.cols[1].children.length){cur.cols[0].append(e);ok=true}
+   if(!ok)left.push(n)}
+  rem=left;if(rem.length)cur=mk(false)}
  pages.forEach((p,i)=>p.querySelector(".pft").textContent="صفحة "+(i+1)+" من "+pages.length+" · +HOME I PLUS · "+dt);
  return pages}
 const jb=(c,q)=>new Promise(r=>c.toBlob(r,"image/jpeg",q));
