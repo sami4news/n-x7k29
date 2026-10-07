@@ -1,0 +1,77 @@
+name: update-news
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-news
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install
+        run: pip install pillow googlenewsdecoder "selectolax<1.0"
+
+      - name: restore media
+        continue-on-error: true
+        run: |
+          mkdir -p media_wt
+          if git ls-remote --exit-code --heads origin media >/dev/null 2>&1; then
+            git fetch --depth=1 origin media
+            git archive FETCH_HEAD | tar -x -C media_wt
+          fi
+
+      - name: fetch news
+        run: python fetch_news.py
+
+      - name: publish media (single orphan commit, no history growth)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(ls -A media_wt 2>/dev/null)" ]; then echo "no media"; exit 0; fi
+          cd media_wt
+          rm -rf .git
+          git init -q -b media
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          git add -A
+          git commit -qm "media"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" media
+
+      - name: commit news.json (retry safely if main moved meanwhile)
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          cp news.json "$RUNNER_TEMP/news.json"
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            cp "$RUNNER_TEMP/news.json" news.json
+            git add news.json
+            if git diff --cached --quiet; then echo "no change"; exit 0; fi
+            if [ "$(git log -1 --format=%an)" = "news-bot" ]; then
+              git commit --amend -qm "update news"
+            else
+              git commit -qm "update news"
+            fi
+            if git push -q --force-with-lease=main:origin/main origin HEAD:main; then echo "pushed (try $i)"; exit 0; fi
+            echo "push rejected, retrying ($i)"; sleep $((i * 5))
+          done
+          echo "could not push after retries"; exit 1
