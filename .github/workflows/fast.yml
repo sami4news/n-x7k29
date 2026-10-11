@@ -1,0 +1,49 @@
+name: fast-telegram
+
+# مسار مستقل تمامًا عن التحديث الكامل: يقرأ قنوات تيليجرام فقط ويكتب breaking.json
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fast-telegram
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      FASTTG: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: fetch telegram
+        run: python fetch_news.py
+
+      - name: commit breaking.json (retry safely)
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          cp breaking.json "$RUNNER_TEMP/breaking.json"
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            cp "$RUNNER_TEMP/breaking.json" breaking.json
+            git add breaking.json
+            if git diff --cached --quiet; then echo "no change"; exit 0; fi
+            git commit -qm "breaking"
+            if git push -q origin HEAD:main; then echo "pushed (try $i)"; exit 0; fi
+            echo "push rejected, retrying ($i)"; sleep $((i * 4))
+          done
+          echo "could not push after retries"; exit 1
