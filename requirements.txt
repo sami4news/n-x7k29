@@ -1,0 +1,5 @@
+pillow
+googlenewsdecoder
+selectolax<1.0
+nudenet
+opencv-python-headless
