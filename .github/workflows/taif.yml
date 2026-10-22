@@ -1,0 +1,58 @@
+name: taif-quick
+
+# تحديث الطائف السريع (3 محطات متتابعة): يُشغَّل من زر «⚡ تحديث أخبار الطائف فقط» في الموقع.
+# كل محطة تبحث بثلث عبارات الطائف وتنشر taif.json فور انتهائها، فيعرض الموقع نتيجتها قبل بدء التالية.
+on:
+  workflow_dispatch:
+    inputs:
+      rid:
+        description: "معرّف الضغطة (وقتها بالثواني) — يرسله الموقع"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: taif-quick
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAIFQ: "1"
+      TAIFRID: ${{ github.event.inputs.rid }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: install
+        run: pip install -q --disable-pip-version-check googlenewsdecoder
+
+      - name: taif stages 1-6 (each one published as soon as it finishes)
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          publish() {
+            [ -f taif.json ] || { echo "no taif.json"; return 0; }
+            cp taif.json "$RUNNER_TEMP/taif.json"
+            for i in 1 2 3 4 5; do
+              git fetch -q origin main
+              git reset -q --hard origin/main
+              cp "$RUNNER_TEMP/taif.json" taif.json
+              git add taif.json
+              if git diff --cached --quiet; then echo "no change"; return 0; fi
+              git commit -qm "taif quick stage $1"
+              if git push -q origin HEAD:main; then echo "pushed stage $1 (try $i)"; return 0; fi
+              echo "push rejected, retrying ($i)"; sleep $((i * 3))
+            done
+            echo "could not push stage $1"; return 1
+          }
+          for s in 1 2 3 4 5 6; do
+            echo "=== stage $s ==="
+            TAIFSTAGE=$s python3 fetch_news.py || echo "stage $s failed"
+            publish $s || true
+          done
