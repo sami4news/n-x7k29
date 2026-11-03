@@ -1,0 +1,49 @@
+name: mag-quick
+
+# تحديث المجلات المستقل: يُشغَّل من زر «تحديث المجلات» في الموقع، ويجلب أقسام المجلات وحدها ويكتب mag.json
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mag-quick
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: install
+        run: pip install -q --disable-pip-version-check pillow googlenewsdecoder "selectolax<1.0"
+
+      - name: install image filter (optional, never blocks the run)
+        continue-on-error: true
+        run: pip install -q --disable-pip-version-check nudenet opencv-python-headless
+
+      - name: fetch magazines
+        run: python3 fetch_mag.py
+
+      - name: publish mag.json
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          [ -f mag.json ] || { echo "no mag.json"; exit 0; }
+          cp mag.json "$RUNNER_TEMP/mag.json"
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            cp "$RUNNER_TEMP/mag.json" mag.json
+            git add mag.json
+            if git diff --cached --quiet; then echo "no change"; exit 0; fi
+            git commit -qm "mag quick update"
+            if git push -q origin HEAD:main; then echo "pushed (try $i)"; exit 0; fi
+            echo "push rejected, retrying ($i)"; sleep $((i * 3))
+          done
+          exit 1
