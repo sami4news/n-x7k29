@@ -1,0 +1,22 @@
+name: x-test
+
+# اختبار سريع لحسابات X (يدويًا من تبويب Actions ثم Run workflow): يطبع في السجل أي الحسابات نجح جلبه وكم منشورًا وأحدثها.
+# لا يكتب شيئًا في الموقع ولا يغيّر الأخبار.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: install
+        run: pip install -q --disable-pip-version-check googlenewsdecoder rapidfuzz trafilatura pillow
+      - name: test X accounts
+        run: python x_test.py
