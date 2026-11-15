@@ -1,0 +1,32 @@
+# حسابات X التي يتابعها الروبوت لأخبار الطائف (سطر لكل حساب)
+# الصيغة:  الاسم الظاهر|اسم الحساب|taif   — الخيار الثالث taif = كل منشورات الحساب تخص الطائف (ولو بلا ذكر كلمة الطائف)
+# كل الحسابات هنا عن الطائف (راجعها صاحب الموقع)؛ احذف |taif من حساب إن أردت أن يُقبل منه ما يذكر الطائف فقط
+# الجلب: الجدول العام المدمج من X أولًا، ثم خوادم Nitter احتياطًا؛ ونتيجة كل حساب تظهر في سجل التشغيل (سطر «حسابات X»)
+غرفة الطائف|taifcci|taif
+عيون الطائف|taif_eyes|taif
+تعليم الطائف|MOE_TIF|taif
+محافظة الطائف|tc_gov|taif
+Live الطائف|livealtaif|taif
+معلومات الطائف|Taif_info|taif
+الطائف الآن|taif_now|taif
+الطائف ksa|ksa_taiff|taif
+لحظات جامعة الطائف|TUmoments|taif
+جامعة الطائف|TaifUniversity|taif
+صحة الطائف|taifhealth|taif
+تجمع الطائف الصحي|TaifHCluster|taif
+مدينة الملك فيصل الطبية بالطائف|kfmc_taif|taif
+مستشفى الملك عبدالعزيز التخصصي بالطائف|kaashtaif|taif
+الصحة النفسية بالطائف|mental_taif|taif
+نادي الطائف للتصوير|Taif_Photoclub|taif
+الطائف 9999|taif_9999|taif
+مبادرات الطائف|TaifInitiatives|taif
+تاريخ الطائف|Taif_History|taif
+خبر 24|khbr_24|taif
+رائد العمري|alomri_raed|taif
+حميدي خالد|humaidykhaled40|taif
+تصن|Tasn_1436|taif
+منتدى الورد العالمي|globalroseforum|taif
+وج|WejSA|taif
+مقهى عكاظ|OkazCafee|taif
+az_z|az_____z|taif
+مجلس الشؤون الاقتصادية|cpcfksa|taif
