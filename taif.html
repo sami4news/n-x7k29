@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>أخبار الطائف · HOME PLUS+</title>
+<style>
+:root{--bg:#0f1720;--cd:#18222e;--fg:#e8edf2;--mu:#93a1b0;--ac:#7fb8f5;--ln:#ffffff1a;--nw:#3fa66b}
+:root[data-theme=light]{--bg:#f5f3ee;--cd:#fff;--fg:#1d2630;--mu:#667381;--ac:#1d5fb8;--ln:#0000001a;--nw:#1e8a4f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.8;font-size:17px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--ln);padding:10px 14px}
+.row{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-size:1.1em;margin:0;flex:1;min-width:140px}
+button{font:inherit;font-size:.85em;color:var(--fg);background:var(--cd);border:1px solid var(--ln);border-radius:10px;padding:4px 14px;cursor:pointer}
+button#rf{background:var(--ac);color:#fff;border-color:transparent;font-weight:700}
+button:disabled{opacity:.6}
+#net{max-width:720px;margin:6px auto 0;font-size:.9em;font-weight:700}#net.ok{color:var(--nw)}#net.no{color:#e5534b}
+#inf{max-width:720px;margin:4px auto 0;font-size:.9em;font-weight:600}
+#st{max-width:720px;margin:4px auto 0;font-size:.78em;color:var(--mu)}
+#st.bad{color:#e0a040}
+main{max-width:720px;margin:0 auto;padding:10px 14px 60px}
+a.c{overflow-wrap:anywhere;display:block;text-decoration:none;color:inherit;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:10px 14px;margin:10px 0}
+a.c:active{opacity:.7}
+a.c.new{border-right:4px solid var(--nw)}
+a.c h2{font-size:1em;margin:0 0 2px;line-height:1.7}
+a.c p{margin:2px 0 0;color:var(--mu);font-size:.88em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bx{display:flex;gap:10px;align-items:flex-start}.tx{flex:1;min-width:0}.th{width:76px;height:76px;object-fit:cover;border-radius:9px;flex:none;background:var(--ln)}
+.m{display:flex;justify-content:space-between;gap:8px;font-size:.76em;color:var(--mu);margin-top:6px}
+.m b{color:var(--ac);font-weight:600}
+.sep{margin:18px 0 4px;font-size:.8em;color:var(--mu);text-align:center}
+.em{text-align:center;color:var(--mu);margin:40px 0}
+</style></head><body>
+<header><div class="row"><h1>🏔️ أخبار الطائف</h1><button id="th" type="button">☀️/🌙</button><button id="fz" type="button">Aa</button><button id="rf" type="button">🔄 تحديث الآن</button></div>
+<div id="net"></div><div id="inf"></div><div id="st">جارٍ التحميل…</div></header>
+<main id="ls"></main>
+<script>
+var BASE="https://sami4news.github.io/n-x7k29/",EVERY=600,KEY="tfq1";
+const LBX=/(?<![ء-ي])طائف\s+(?:ال)?(?:مالي|اقتصادي|سياسي|جديد|نقدي|مصرفي|ثان\S*)|الطريق (?:إلى|الى) الطا[ئي]ف(?=.{0,60}(?:وثائقي|كواليس|اتفاق|الحرب|لبنان))|كواليس (?:اتفاق|الطا[ئي]ف)|اتفاق(?:\S+\s+){0,4}(?:أنهى|انهى|ينهي|أنهت|انهت) (?:ال)?حرب|الحرب الأهلية|الحرب الاهلية|الحرب اللبنانية|الفتن\s+الطا[ئي]ف|الفتنة\s+الطا[ئي]ف|الأزهر|بيت العائلة|الأقباط|الكنيسة|اتفاق الطا[ئي]ف|وثيقة الطا[ئي]ف|مؤتمر الطا[ئي]ف|تنفيذ الطا[ئي]ف|تطبيق الطا[ئي]ف|بنود الطا[ئي]ف|دستور الطا[ئي]ف|مسيحي|المسيحية|الموارنة|ماروني|بكركي|نص الطا[ئي]ف|ثوابت الطا[ئي]ف|وفق الطا[ئي]ف|بموجب الطا[ئي]ف|ما بعد الطا[ئي]ف|ميثاق(?:ية)? الطا[ئي]ف|المناصفة|التنمية والتحرير|حركة أمل|الثنائي الشيعي|علي حسن خليل|قانون الانتخابات|قوانين الانتخابات|حصر(?:ية)? السلاح|التيار الوطني الحر|القوات اللبنانية|الكتائب|جعجع|جنبلاط|ميقاتي|نبيه بري|الحريري|لبنان|بيروت|حزب الله|طرابلس|جوزاف عون|الرئيس عون|زيارة عون|عون إلى|المحاصصة|الطائفية|النظام الطائفي|قراعلي|سلام الحكومي|نواف سلام|بعبدا|السرايا الحكومية|الطائف لا يتجزأ|الطائف لا يتجزّأ|مرجع(?:ية|يتها)\s+(?:ال)?طا[ئي]ف|(?:التمسك|تمسك|التزام|الالتزام|يتمسك|تتمسك)\s+ب(?:ال)?طا[ئي]ف|اللقاء الديمقراطي|الحزب التقدمي|التقدمي الاشتراكي|اللقاء التشاوري|الجمهورية القوية|وليد جنبلاط|تيمور جنبلاط|سمير جعجع|سعد الحريري|حزب الكتائب|سامي الجميل|المردة|فرنجية/;
+const TF_P="(?:و|ب|ل|ف|ك)?(?:ال)?",TF_E="(?![ء-ي])",TF_S="(?:طا[ئي]ف|عقبة الهدا|تلفريك الهدا|منتزه سيسد|سد سيسد|وادي محرم|سد السملقي|سد عكرمة|مسجد عداس|مسجد الكوع|مصنع راشد القرشي|برحة القزاز|عقبة كرا|درب كرا|جبل دكا|منتزه الحدبان|محازة الصيد|قصر الدهلوي|قصر البوقري|قلعة العرفاء|مسجد المدهون|قرية الكر السياحية|ميقات قرن المنازل|الهدا|الحوية|ثقيف|الشفا|السيل الكبير|السيل الصغير|الوهط|الردف|قرن المنازل|قصر شبرا|مسجد ابن عباس|وادي وج|المثناة|شهار|ورد\\s+الطائفي|جوري مول|تيرا مول|كلية الدفاع الجوي|قاعدة الملك فهد الجوية|مستشفى الأمير منصور|وادي نعمان|جبل كرا|مخطط البيعة|سوق العنقري|حي القمرية|حي السحيلي|مستشفى العدواني|حي\\s+(?:ال)?(?:شهار|المثناة|الحوية|الردف|قروى|القطبية|معشي|أم العراد|الوشحاء|سويديرة|الوهيط|الرميدة|ريحة|الدهاس|المعترض|المضباع|العسيلة|ركاء|باب الريع|القديرة|ابن سويلم|الشطبة|وادي النمل|الحلقة الشرقية|الحلقة الغربية|السيل الصغير)|كبري\\s+(?:ال)?(?:دهاس|الدهاس)|جامعة سيسد|مطار الطائف الجديد)",TF_W1="(?:محافظة|محافظ|مركز|بلدية|أهالي|سكان|مدينة|إمارة|أمير|طريق|مستشفى|قرية|قرى|هجرة)\\s+(?:ال)?(?:تربة|رنية|الخرمة|الموية|أضم|ترعة|العرضيات)",TF_W2="(?:ميسان|بني سعد|ظلم|ترعة|الموية|الخرمة|رنية|العرضيات)";
+const TF_RS=new RegExp("(?<![ء-ي])"+TF_P+TF_S+TF_E),TF_R1=new RegExp("(?<![ء-ي])"+TF_P+TF_W1+TF_E),TF_R2=new RegExp("(?<![ء-ي])"+TF_P+TF_W2+TF_E),TF_SA=/السعودية|المملكة|منطقة مكة|مكة المكرمة/,TF_IQ=/العراق|عراقي|العمارة|بغداد|البصرة|ذي قار|دجلة|رئيس الوزراء|الشيب|السوداني|الحشد|الأهوار|كردستان|أربيل|الموصل|النجف|كربلاء|الأنبار|ديالى|الناصرية|منفذ حدودي|المنفذ الحدودي|الحدودي/,TF_OK=/(?<![ء-ي])(?:و|ب|ل|ف|ك)?(?:ال)?سوق عكاظ(?![ء-ي])/,TF_OC=/السعودية|المملكة|مكة|الطا[ئي]ف|مهرجان|موسم|الشعراء|الشعر|وزارة الثقافة|الترفيه|الفيصل|الجنادرية|هيئة/,TF_FO=/المغرب|مغربي|الجزائر|تونس|ليبيا|مصر|الأردن|الكويت|لبنان|السودان|البرلمان|مجلس النواب|الدستور/;
+const TF_AMB=new RegExp("(?<!تلفريك )(?<!عقبة )(?<![ء-ي])"+TF_P+"(?:الوهط|الشفا|الردف|شهار|المثناة|الحوية|الهدا)"+TF_E,"g"),TF_AV=/اليمن|يمني|لحج|عدن|صنعاء|تعز|مأرب|حضرموت|الحديدة|الحوثي|النازحين|النزوح|سوريا|سوري|دمشق|العراق|لبنان|غزة|السودان|ليبيا|مصر|الأردن|عجلون|الكرك|إربد|عمّان|فلسطين|الصومال|إثيوبيا|أفغانستان|اليونيسف|الأونروا/,TF_PS=/الطا[ئي]ف|ثقيف|السعودية|السعودي|المملكة|منطقة مكة|مكة المكرمة|جدة|مكة/;
+const TFN={test:t=>(TF_RS.test(t)&&(TF_RS.test(t.replace(TF_AMB," "))||(!TF_AV.test(t)&&TF_PS.test(t))))||(TF_OK.test(t)&&TF_OC.test(t)&&!TF_FO.test(t))||(!TF_IQ.test(t)&&(!TF_AV.test(t)||/الطا[ئي]ف/.test(t))&&(TF_R1.test(t)||(TF_R2.test(t)&&TF_SA.test(t))))};   /* الطائف فقط إن ذُكر في العنوان أو الوصف */
+const gr=n=>{if(n._g)return n._g;let g=n.gr||(n.tf?"taif":n.c);if(g==="taif"&&!/(?:t\.me|x\.com)\//.test(n.s||"")&&(LBX.test((n.t||"")+" "+(n.b||""))||!TFN.test((n.t||"")+" "+(n.b||"")))){g=(n.c&&n.c!=="sa"&&n.c!=="taif")?n.c:"me"}   /* اتفاق الطائف اللبناني ليس من أخبار المدينة: يُنقل فورًا لقسمه حتى قبل تحديث الروبوت */
+ return n._g=g};
+var $=function(i){return document.getElementById(i)},H=document.documentElement,LS=window.localStorage;
+function sg(k){try{return LS.getItem(k)}catch(e){return null}}function ss(k,v){try{LS.setItem(k,v)}catch(e){}}
+if(sg("tth")==="light")H.setAttribute("data-theme","light");
+var ZS=[15,17,19,21],zi=+sg("tfz");if(!(zi>=0&&zi<4))zi=1;document.body.style.fontSize=ZS[zi]+"px";
+$("th").onclick=function(){var l=H.getAttribute("data-theme")==="light";if(l)H.removeAttribute("data-theme");else H.setAttribute("data-theme","light");ss("tth",l?"dark":"light")};
+$("fz").onclick=function(){zi=(zi+1)%4;document.body.style.fontSize=ZS[zi]+"px";ss("tfz",zi)};
+var TFA=/(?:t\.me|x\.com|twitter\.com)\//;
+function isTaif(n){var g=gr(n);if(g==="taif")return true;var tx=(n.t||"")+" "+(n.b||"");return !LBX.test(tx)&&TFN.test(tx)}
+function url(n){return String(n.s||"").replace(/[?&]n=\d+$/,"")}
+function key(n){return (n.t||"").replace(/\s+/g," ").slice(0,60)}
+function ago(ts){var d=Math.max(0,Date.now()/1000-ts),m=Math.floor(d/60);if(m<1)return "الآن";if(m<60)return "قبل "+m+" د";var h=Math.floor(m/60);if(h<24)return "قبل "+h+" س";return "قبل "+Math.floor(h/24)+" يوم"}
+function hm(ts){var d=new Date((ts+10800)*1000),p=function(x){return(x<10?"0":"")+x};return p(d.getUTCHours())+":"+p(d.getUTCMinutes())}
+function esc(s){return String(s||"").replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function imgOf(n){var u=n.img||(n.imgs&&n.imgs[0])||"";if(u&&typeof u==="object")u=u.u||u.src||"";u=String(u||"");if(!u)return "";if(/^https?:/.test(u))return u;if(/^\/\//.test(u))return "https:"+u;return BASE+u.replace(/^\.?\//,"")}
+function pick(list){var seen={},out=[];(list||[]).forEach(function(n){if(!n||!n.t||!n.s||!/^https?:/.test(n.s))return;try{if(!isTaif(n))return}catch(e){return}var k=key(n);if(seen[k])return;seen[k]=1;out.push({t:n.t,b:(n.b||"").slice(0,220),s:url(n),src:n.src||"",ts:+n.ts||0,im:imgOf(n)})});out.sort(function(a,b){return b.ts-a.ts});return out.slice(0,80)}
+var DATA=null,UPD=0,LAST=0,NEWN=0;
+function info(){$("inf").textContent=LAST?"🕒 آخر تحديث تم: "+hm(LAST)+"  ·  🆕 أخبار جديدة: "+NEWN:""}
+function render(){var L=$("ls");if(!DATA||!DATA.length){L.innerHTML='<div class="em">لا توجد أخبار طائف محفوظة بعد</div>';return}
+ var now=Date.now()/1000,h="",old=false;DATA.forEach(function(n){if(!old&&now-n.ts>86400){old=true;h+='<div class="sep">— أقدم من 24 ساعة —</div>'}
+ h+='<a class="c'+(now-n.ts<3600?" new":"")+'" href="'+esc(n.s)+'" target="_blank" rel="noopener"><div class="bx">'+(n.im?'<img class="th" loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(n.im)+'" onerror="this.remove()">':"")+'<div class="tx"><h2>'+esc(n.t)+'</h2>'+(n.b&&n.b!==n.t?'<p>'+esc(n.b)+'</p>':"")+'</div></div><div class="m"><b>'+esc(n.src)+'</b><span>'+hm(n.ts)+' · '+ago(n.ts)+'</span></div></a>'});L.innerHTML=h}
+function status(msg,bad){var s=$("st");s.textContent=msg;s.className=bad?"bad":""}
+function fj(f){var ctl=window.AbortController?new AbortController():null,t=ctl&&setTimeout(function(){ctl.abort()},20000);return fetch(BASE+f+"?_="+Date.now(),{cache:"no-store",signal:ctl?ctl.signal:undefined}).then(function(r){clearTimeout(t);if(!r.ok)throw 0;return r.json()})}
+function net(ok){var e=$("net");e.className=ok?"ok":"no";e.textContent=ok?"يوجد اتصال بالنت ✅":"تعذر وجود اتصال بالنت ❌"}
+net(navigator.onLine!==false);
+var busy=false;
+function load(manual){if(busy)return;busy=true;var b=$("rf");b.disabled=true;b.textContent="⏳ جارٍ التحديث…";
+ Promise.all([fj("news.json").catch(function(){return null}),fj("taif.json").catch(function(){return null})]).then(function(r){
+  var a=r[0],q=r[1];if(!a&&!q)throw 0;var items=((q&&q.items)||[]).concat((a&&a.items)||[]);var nd=pick(items);
+  var u=Math.max((a&&a.updated)||0,(q&&q.updated)||0);
+  var pv={};(DATA||[]).forEach(function(x){pv[x.s]=1});if(nd.length){NEWN=DATA?nd.filter(function(x){return !pv[x.s]}).length:nd.length;DATA=nd;UPD=u}else NEWN=0;
+  LAST=Date.now()/1000;if(nd.length)ss(KEY,JSON.stringify({d:nd,u:u,t:Math.floor(LAST),n:NEWN}));info();net(true);$("st").className="";render();tick();
+  }).catch(function(){net(false);status("⚠️ تعذّر الاتصال — تُعرض آخر نسخة محفوظة"+(LAST||UPD?" (تحديث "+ago(LAST||UPD)+")":""),true)}).then(function(){busy=false;b.disabled=false;b.textContent="🔄 تحديث الآن";nx=Date.now()+EVERY*1000});}
+var nx=Date.now()+EVERY*1000;
+function tick(){if(busy)return;var s=Math.max(0,Math.round((nx-Date.now())/1000)),p=function(x){return(x<10?"0":"")+x};
+ if(LAST&&!$("st").className)status("التالي بعد "+p(Math.floor(s/60))+":"+p(s%60)+" · "+DATA.length+" خبر")}
+var rc=0;setInterval(function(){tick();if(Date.now()>=nx)load(false);if(++rc%60===0&&DATA)render()},1000);
+$("rf").onclick=function(){load(true)};
+document.addEventListener("visibilitychange",function(){if(!document.hidden&&Date.now()>=nx-1000)load(false)});
+window.addEventListener("online",function(){net(true);load(false)});window.addEventListener("offline",function(){net(false)});
+try{var c=JSON.parse(sg(KEY)||"null");if(c&&c.d){DATA=c.d;UPD=c.u;LAST=c.t;NEWN=c.n||0;info();render();status("نسخة محفوظة (تحديث "+ago(c.t)+") — جارٍ التحديث…",true)}}catch(e){}
+load(false);
+</script></body></html>
